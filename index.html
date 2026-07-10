@@ -276,8 +276,6 @@ hr.rule{border:none;border-top:1px solid var(--line);margin:22px 0;}
 --------------------------------------------------------- */
 const SUPABASE_URL = 'https://fquhwgqlsnfihdkfhbpa.supabase.co';        // e.g. https://abcdefgh.supabase.co
 const SUPABASE_ANON_KEY = 'sb_publishable_UU7lEWmZ6KMl5JZK89BmNA_3jP6yG00';
-const FAKE_EMAIL_DOMAIN = 'ctbridgebikes.local';  // do not change unless you know why
-
 const NOT_CONFIGURED = !SUPABASE_URL || SUPABASE_URL.indexOf('YOUR_SUPABASE_URL') !== -1
   || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.indexOf('YOUR_SUPABASE_ANON_KEY') !== -1;
 
@@ -299,7 +297,6 @@ function escapeHtml(str){
 function nl2br(str){ return escapeHtml(str).replace(/\n/g,'<br>'); }
 function fmtPrice(n){ const num = Number(n)||0; return '$' + num.toLocaleString('en-US',{maximumFractionDigits:2}); }
 function fmtDate(ts){ try{ return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); } catch(e){ return ''; } }
-function usernameToEmail(username){ return username.trim().toLowerCase().replace(/[^a-z0-9_.-]/g,'') + '@' + FAKE_EMAIL_DOMAIN; }
 function toast(msg, ms){
   const el = document.getElementById('toast');
   el.textContent = msg;
@@ -310,8 +307,10 @@ function toast(msg, ms){
 function friendlyError(error){
   if(!error) return 'Something went wrong.';
   const msg = error.message || String(error);
-  if(/already registered|duplicate key|profiles_username/i.test(msg)) return 'That username is already taken.';
-  if(/invalid login credentials/i.test(msg)) return 'Incorrect username or password.';
+  if(/duplicate key|profiles_username/i.test(msg)) return 'That username is already taken.';
+  if(/already registered/i.test(msg)) return 'That email already has an account — try logging in instead.';
+  if(/invalid login credentials/i.test(msg)) return 'Incorrect email or password.';
+  if(/unable to validate email|invalid email/i.test(msg)) return 'Please enter a valid email address.';
   if(/password should be at least/i.test(msg)) return 'Password must be at least 6 characters.';
   return msg;
 }
@@ -760,7 +759,7 @@ function openLoginModal(){
   openModal(
     '<h2 style="margin-bottom:18px;">Log In</h2>'
     + '<form id="login-form">'
-    +   '<label>Username</label><input type="text" name="username" required>'
+    +   '<label>Email</label><input type="email" name="email" required>'
     +   '<label>Password</label><input type="password" name="password" required>'
     +   '<button class="btn" type="submit" style="width:100%;" id="login-btn">Log In</button>'
     + '</form>'
@@ -771,7 +770,8 @@ function openSignupModal(){
   openModal(
     '<h2 style="margin-bottom:18px;">Create a Customer Account</h2>'
     + '<form id="signup-form">'
-    +   '<label>Choose a username</label><input type="text" name="username" required minlength="3">'
+    +   '<label>Email</label><input type="email" name="email" required>'
+    +   '<label>Choose a display name</label><input type="text" name="username" required minlength="3">'
     +   '<label>Password</label><input type="password" name="password" required minlength="6">'
     +   '<button class="btn" type="submit" style="width:100%;" id="signup-btn">Sign Up</button>'
     + '</form>'
@@ -812,20 +812,19 @@ function openSettingsModal(){
 /* ---------------------------------------------------------
    8. ACTIONS: auth
 --------------------------------------------------------- */
-async function doLogin(username, password){
-  const email = usernameToEmail(username);
-  const { error } = await sb.auth.signInWithPassword({ email, password });
+async function doLogin(email, password){
+  const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password });
   if(error){ toast(friendlyError(error)); return false; }
   await refreshSession();
   toast('Welcome back, ' + cache.profile.username + '.');
   return true;
 }
-async function doSignup(username, password){
+async function doSignup(email, username, password){
   username = username.trim();
-  if(!/^[a-zA-Z0-9_. -]{3,30}$/.test(username)){ toast('Please use a simple username (letters, numbers, spaces, 3-30 chars).'); return false; }
+  email = email.trim();
+  if(!/^[a-zA-Z0-9_. -]{3,30}$/.test(username)){ toast('Please use a simple display name (letters, numbers, spaces, 3-30 chars).'); return false; }
   const { data: existing } = await sb.from('profiles').select('username').ilike('username', username).maybeSingle();
-  if(existing){ toast('That username is already taken.'); return false; }
-  const email = usernameToEmail(username);
+  if(existing){ toast('That display name is already taken.'); return false; }
   const { error } = await sb.auth.signUp({ email, password, options:{ data:{ username: username } } });
   if(error){ toast(friendlyError(error)); return false; }
   await refreshSession();
@@ -1096,7 +1095,7 @@ document.addEventListener('submit', function(e){
     const fd = new FormData(form);
     const btn = document.getElementById('login-btn');
     if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Logging in\u2026'; }
-    doLogin(fd.get('username'), fd.get('password')).then(function(ok){
+    doLogin(fd.get('email'), fd.get('password')).then(function(ok){
       if(ok){ closeModal(); renderShell(); }
       else if(btn){ btn.disabled = false; btn.textContent = 'Log In'; }
     });
@@ -1105,7 +1104,7 @@ document.addEventListener('submit', function(e){
     const fd = new FormData(form);
     const btn = document.getElementById('signup-btn');
     if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Signing up\u2026'; }
-    doSignup(fd.get('username'), fd.get('password')).then(function(ok){
+    doSignup(fd.get('email'), fd.get('username'), fd.get('password')).then(function(ok){
       if(ok){ closeModal(); renderShell(); }
       else if(btn){ btn.disabled = false; btn.textContent = 'Sign Up'; }
     });
@@ -1115,7 +1114,7 @@ document.addEventListener('submit', function(e){
     const u = currentUser();
     if(!u) return;
     (async function(){
-      const email = usernameToEmail(u.username);
+      const email = cache.session.user.email;
       const { error: verifyErr } = await sb.auth.signInWithPassword({ email, password: fd.get('current') });
       if(verifyErr){ toast('Current password is incorrect.'); return; }
       const { error } = await sb.auth.updateUser({ password: fd.get('next') });
@@ -1188,4 +1187,3 @@ init();
 </script>
 </body>
 </html>
-
