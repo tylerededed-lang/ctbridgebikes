@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CT Bridge Bikes &mdash; Repairing, Selling and Buying Bikes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* =========================================================
+   CT BRIDGE BIKES — design tokens
+   ========================================================= */
+:root[data-theme="light"]{
+  --bg:#EDEAE3;
+  --surface:#FFFFFF;
+  --surface-2:#F7F4EE;
+  --ink:#20262B;
+  --ink-soft:#5B6670;
+  --accent:#B5461C;
+  --accent-ink:#FFFFFF;
+  --accent-2:#2E4756;
+  --accent-2-ink:#FFFFFF;
+  --line: rgba(32,38,43,0.14);
+  --line-strong: rgba(32,38,43,0.28);
+  --success:#3F7D45;
+  --danger:#B23A2E;
+  --shadow: 0 10px 30px rgba(32,38,43,0.10);
+  --paper-hole: #EDEAE3;
+}
+:root[data-theme="dark"]{
+  --bg:#14181B;
+  --surface:#1B2126;
+  --surface-2:#20272C;
+  --ink:#EDEAE2;
+  --ink-soft:#9BA6AC;
+  --accent:#E27A3F;
+  --accent-ink:#1A1108;
+  --accent-2:#7FA8BE;
+  --accent-2-ink:#0E1A20;
+  --line: rgba(237,234,226,0.16);
+  --line-strong: rgba(237,234,226,0.30);
+  --success:#5FAF68;
+  --danger:#E0574A;
+  --shadow: 0 10px 30px rgba(0,0,0,0.45);
+  --paper-hole: #14181B;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  transition:background .2s ease, color .2s ease;
+}
+h1,h2,h3,h4,.display{
+  font-family:'Oswald',Impact,'Arial Narrow',sans-serif;
+  text-transform:uppercase;
+  letter-spacing:.02em;
+  font-weight:600;
+  margin:0;
+}
+.mono{font-family:'JetBrains Mono',monospace;}
+a{color:inherit;}
+button{font-family:inherit;}
+img{max-width:100%;display:block;}
+
+#app{min-height:100vh;display:flex;flex-direction:column;}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px;}
+
+header.site-head{
+  position:sticky;top:0;z-index:40;
+  background:var(--surface);
+  border-bottom:1px solid var(--line);
+}
+.head-row{
+  display:flex;align-items:center;gap:20px;
+  padding:16px 24px;max-width:1180px;margin:0 auto;
+}
+.brand{display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none;}
+.brand-mark{width:38px;height:38px;flex:none;}
+.brand-text .name{font-size:22px;line-height:1;color:var(--ink);}
+.brand-text .tag{font-family:'Inter';font-size:11px;letter-spacing:.06em;color:var(--ink-soft);text-transform:uppercase;margin-top:3px;}
+nav.tabs{display:flex;gap:4px;margin-left:12px;flex:1;flex-wrap:wrap;}
+nav.tabs button{
+  background:transparent;border:none;color:var(--ink-soft);
+  font-family:'Oswald';text-transform:uppercase;letter-spacing:.04em;font-size:14px;
+  padding:10px 14px;border-radius:6px;cursor:pointer;position:relative;
+}
+nav.tabs button:hover{color:var(--ink);background:var(--surface-2);}
+nav.tabs button.active{color:var(--ink);}
+nav.tabs button.active::after{
+  content:"";position:absolute;left:14px;right:14px;bottom:2px;height:3px;background:var(--accent);border-radius:2px;
+}
+.head-actions{display:flex;align-items:center;gap:8px;}
+.icon-btn{
+  width:38px;height:38px;border-radius:8px;border:1px solid var(--line);background:var(--surface);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink);
+}
+.icon-btn:hover{border-color:var(--line-strong);background:var(--surface-2);}
+.btn{
+  font-family:'Oswald';text-transform:uppercase;letter-spacing:.03em;font-size:13px;
+  padding:10px 16px;border-radius:8px;border:1px solid transparent;cursor:pointer;
+  background:var(--accent);color:var(--accent-ink);transition:filter .15s ease, transform .1s ease;
+}
+.btn:hover{filter:brightness(1.08);}
+.btn:active{transform:translateY(1px);}
+.btn.secondary{background:var(--accent-2);color:var(--accent-2-ink);}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line-strong);}
+.btn.danger{background:var(--danger);color:#fff;}
+.btn.small{padding:7px 11px;font-size:12px;}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+
+.cable-divider{width:100%;height:14px;overflow:hidden;line-height:0;}
+.cable-divider svg{width:100%;height:14px;display:block;}
+.gearlogo{color:var(--accent);}
+
+main{flex:1;}
+.section{padding:40px 0;}
+.section-tight{padding:20px 0;}
+.eyebrow{font-family:'JetBrains Mono';font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:8px;display:block;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:22px;}
+.card{
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;
+  box-shadow:var(--shadow); display:flex;flex-direction:column;
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.card:hover{transform:translateY(-3px);}
+.card .thumb{width:100%;aspect-ratio:4/3;object-fit:cover;background:var(--surface-2);}
+.card .thumb-empty{width:100%;aspect-ratio:4/3;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:var(--ink-soft);}
+.card-body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:6px;flex:1;}
+.card-title{font-size:17px;}
+.card-meta{font-size:13px;color:var(--ink-soft);display:flex;justify-content:space-between;align-items:center;}
+.stars{color:var(--accent);font-size:13px;letter-spacing:1px;}
+.sold-ribbon{
+  position:absolute;top:12px;left:-8px;background:var(--danger);color:#fff;font-family:'Oswald';
+  font-size:11px;letter-spacing:.08em;padding:4px 14px;transform:rotate(-8deg);box-shadow:var(--shadow);
+}
+.card-media{position:relative;}
+
+.hangtag{
+  display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:var(--accent-ink);
+  font-family:'JetBrains Mono';font-weight:600;font-size:15px;padding:6px 12px 6px 8px;border-radius:3px;
+  position:relative;
+}
+.hangtag::before{
+  content:"";width:9px;height:9px;border-radius:50%;background:var(--paper-hole);border:2px solid var(--accent-ink);
+  opacity:.55;
+}
+
+label{display:block;font-size:13px;color:var(--ink-soft);margin-bottom:6px;font-family:'Oswald';text-transform:uppercase;letter-spacing:.03em;}
+input[type=text],input[type=email],input[type=password],input[type=number],input[type=tel],textarea,select{
+  width:100%;padding:11px 12px;border-radius:8px;border:1px solid var(--line-strong);
+  background:var(--surface);color:var(--ink);font-family:'Inter';font-size:14px;margin-bottom:16px;
+}
+textarea{resize:vertical;min-height:90px;}
+input:focus,textarea:focus,select:focus,button:focus-visible,[contenteditable]:focus{
+  outline:2px solid var(--accent-2);outline-offset:1px;
+}
+.field-row{display:flex;gap:14px;}
+.field-row>div{flex:1;}
+.form-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:26px;box-shadow:var(--shadow);max-width:640px;}
+.helptext{font-size:12px;color:var(--ink-soft);margin:-10px 0 16px;}
+
+.upload-box{
+  border:2px dashed var(--line-strong);border-radius:10px;padding:20px;text-align:center;
+  color:var(--ink-soft);cursor:pointer;margin-bottom:14px;
+}
+.upload-box:hover{border-color:var(--accent);color:var(--ink);}
+.preview-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+.preview-thumb{position:relative;width:88px;height:88px;border-radius:8px;overflow:hidden;border:1px solid var(--line);}
+.preview-thumb img{width:100%;height:100%;object-fit:cover;}
+.preview-thumb .rm{
+  position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.6);
+  color:#fff;border:none;cursor:pointer;font-size:12px;line-height:1;
+}
+
+.overlay{
+  position:fixed;inset:0;background:rgba(20,24,27,.55);display:flex;align-items:center;justify-content:center;
+  z-index:100;padding:20px;
+}
+.modal{
+  background:var(--surface);border-radius:14px;max-width:560px;width:100%;max-height:88vh;overflow-y:auto;
+  padding:28px;box-shadow:var(--shadow);position:relative;
+}
+.modal.wide{max-width:820px;}
+.modal-close{
+  position:absolute;top:16px;right:16px;background:transparent;border:none;font-size:20px;cursor:pointer;color:var(--ink-soft);
+  width:32px;height:32px;border-radius:8px;
+}
+.modal-close:hover{background:var(--surface-2);color:var(--ink);}
+
+.hp-block{position:relative;margin-bottom:0;}
+.hp-heading{padding:56px 0 18px;font-size:clamp(28px,5vw,46px);text-align:center;}
+.hp-text{padding:6px 0 30px;max-width:760px;margin:0 auto;font-size:16px;color:var(--ink-soft);text-align:center;}
+.hp-image{padding:10px 0 30px;}
+.hp-image img{width:100%;max-height:460px;object-fit:cover;border-radius:14px;}
+.hp-divider{padding:20px 0;}
+.edit-controls{display:flex;gap:6px;justify-content:center;margin-bottom:10px;flex-wrap:wrap;}
+.edit-controls button{
+  background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:11px;
+  cursor:pointer;color:var(--ink);font-family:'JetBrains Mono';
+}
+.edit-controls button:hover{border-color:var(--accent);}
+.hp-block.editing{outline:2px dashed var(--accent-2);outline-offset:6px;border-radius:10px;}
+[contenteditable="true"]{cursor:text;}
+[contenteditable="true"]:hover{background:var(--surface-2);border-radius:8px;}
+.add-block-bar{display:flex;gap:10px;justify-content:center;padding:30px 0;flex-wrap:wrap;border-top:1px dashed var(--line-strong);margin-top:20px;}
+
+.hero{position:relative;background:var(--surface-2);border-bottom:1px solid var(--line);overflow:hidden;}
+
+.review{border-top:1px solid var(--line);padding:14px 0;}
+.review-head{display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);}
+.star-picker{display:flex;gap:4px;font-size:22px;}
+.star-picker button{background:none;border:none;cursor:pointer;color:var(--line-strong);padding:0;}
+.star-picker button.on{color:var(--accent);}
+
+.badge{display:inline-block;background:var(--surface-2);border:1px solid var(--line);border-radius:20px;padding:3px 11px;font-size:11px;font-family:'Oswald';letter-spacing:.03em;text-transform:uppercase;color:var(--ink-soft);}
+.badge.admin{background:var(--accent);color:var(--accent-ink);border-color:transparent;}
+.empty-state{text-align:center;padding:60px 20px;color:var(--ink-soft);}
+.toast{
+  position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);
+  padding:12px 20px;border-radius:10px;font-size:14px;z-index:200;box-shadow:var(--shadow);
+  opacity:0;pointer-events:none;transition:opacity .2s ease, bottom .2s ease;max-width:90vw;text-align:center;
+}
+.toast.show{opacity:1;bottom:34px;}
+footer.site-foot{border-top:1px solid var(--line);background:var(--surface);padding:34px 0;margin-top:auto;}
+.foot-grid{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;font-size:13px;color:var(--ink-soft);}
+.foot-grid strong{color:var(--ink);}
+.switch{display:flex;align-items:center;gap:10px;}
+.switch-track{width:44px;height:24px;border-radius:20px;background:var(--surface-2);border:1px solid var(--line-strong);position:relative;cursor:pointer;}
+.switch-thumb{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--accent);transition:left .15s ease;}
+:root[data-theme="dark"] .switch-thumb{left:22px;}
+.settings-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);}
+.settings-row:last-child{border-bottom:none;}
+.gallery-main{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;background:var(--surface-2);}
+.gallery-thumbs{display:flex;gap:8px;margin-top:8px;overflow-x:auto;}
+.gallery-thumbs img{width:64px;height:64px;object-fit:cover;border-radius:6px;cursor:pointer;border:2px solid transparent;}
+.gallery-thumbs img.active{border-color:var(--accent);}
+.detail-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:28px;}
+@media (max-width:720px){
+  .detail-grid{grid-template-columns:1fr;}
+  nav.tabs{order:3;width:100%;justify-content:center;}
+  .head-row{flex-wrap:wrap;}
+}
+hr.rule{border:none;border-top:1px solid var(--line);margin:22px 0;}
+.help-box{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:16px;font-size:13px;color:var(--ink-soft);margin-bottom:18px;}
+.help-box code{background:var(--surface);padding:1px 5px;border-radius:4px;}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:currentColor;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.setup-screen{max-width:640px;margin:60px auto;padding:0 24px;}
+.setup-screen .form-card{max-width:none;}
+.setup-screen code{background:var(--surface-2);padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono';font-size:13px;}
+.setup-screen ol{padding-left:20px;line-height:1.9;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modal-root"></div>
+<div id="toast" class="toast"></div>
+
+<script>
+/* =========================================================
+   CT BRIDGE BIKES — application logic
+   Backed by Supabase (shared database + file storage + login).
+   See DEPLOY.md for one-time setup instructions.
+   ========================================================= */
+(function(){
+"use strict";
+
+/* ---------------------------------------------------------
+   0. CONFIG — paste your project's values here (see DEPLOY.md)
+--------------------------------------------------------- */
+const SUPABASE_URL = 'https://fquhwgqlsnfihdkfhbpa.supabase.co';        // e.g. https://abcdefgh.supabase.co
+const SUPABASE_ANON_KEY = 'sb_publishable_UU7lEWmZ6KMl5JZK89BmNA_3jP6yG00';
+const FAKE_EMAIL_DOMAIN = 'ctbridgebikes.local';  // do not change unless you know why
+
+const NOT_CONFIGURED = !SUPABASE_URL || SUPABASE_URL.indexOf('YOUR_SUPABASE_URL') !== -1
+  || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.indexOf('YOUR_SUPABASE_ANON_KEY') !== -1;
+
+let sb = null;
+if(!NOT_CONFIGURED){
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+/* ---------------------------------------------------------
+   1. UTILITIES
+--------------------------------------------------------- */
+function uid(prefix){ return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function escapeHtml(str){
+  if(str===undefined || str===null) return '';
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function nl2br(str){ return escapeHtml(str).replace(/\n/g,'<br>'); }
+function fmtPrice(n){ const num = Number(n)||0; return '$' + num.toLocaleString('en-US',{maximumFractionDigits:2}); }
+function fmtDate(ts){ try{ return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); } catch(e){ return ''; } }
+function usernameToEmail(username){ return username.trim().toLowerCase().replace(/[^a-z0-9_.-]/g,'') + '@' + FAKE_EMAIL_DOMAIN; }
+function toast(msg, ms){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>el.classList.remove('show'), ms||2600);
+}
+function friendlyError(error){
+  if(!error) return 'Something went wrong.';
+  const msg = error.message || String(error);
+  if(/already registered|duplicate key|profiles_username/i.test(msg)) return 'That username is already taken.';
+  if(/invalid login credentials/i.test(msg)) return 'Incorrect username or password.';
+  if(/password should be at least/i.test(msg)) return 'Password must be at least 6 characters.';
+  return msg;
+}
+
+/* ---------------------------------------------------------
+   2. STATE
+--------------------------------------------------------- */
+let cache = {
+  session: null,
+  profile: null,     // {id, username, role, joined}
+  listings: [],
+  home: [],
+  shopInfo: {}
+};
+let settings = { theme: (localStorage.getItem('ctbb_theme') || 'light') };
+let route = { tab:'home', listingId:null };
+let uiCache = { pendingFiles:[], pendingPreviewUrls:[], editingHome:false, homeDraft:null, galleryIndex:0, busy:false };
+
+function currentUser(){ return cache.profile ? { username: cache.profile.username, role: cache.profile.role } : null; }
+function isAdmin(){ return !!cache.profile && cache.profile.role === 'admin'; }
+
+/* ---------------------------------------------------------
+   3. DATA ACCESS (Supabase)
+--------------------------------------------------------- */
+async function refreshSession(){
+  const { data } = await sb.auth.getSession();
+  cache.session = data.session || null;
+  if(cache.session){
+    const { data: profile, error } = await sb.from('profiles').select('*').eq('id', cache.session.user.id).single();
+    cache.profile = error ? null : profile;
+  } else {
+    cache.profile = null;
+  }
+}
+
+async function fetchListings(){
+  const { data, error } = await sb
+    .from('listings')
+    .select('*, listing_images(url, position), reviews(username, rating, comment, created_at)')
+    .order('created_at', { ascending:false });
+  if(error){ console.error(error); toast('Could not load listings: ' + friendlyError(error)); cache.listings = []; return; }
+  cache.listings = (data||[]).map(function(l){
+    const images = (l.listing_images||[]).slice().sort((a,b)=>a.position-b.position).map(x=>x.url);
+    const reviews = (l.reviews||[]).slice().sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
+    return Object.assign({}, l, { images: images, reviews: reviews });
+  });
+}
+async function fetchHome(){
+  const { data, error } = await sb.from('home_blocks').select('*').order('position', { ascending:true });
+  if(error){ console.error(error); cache.home = []; return; }
+  cache.home = data || [];
+}
+async function fetchShopInfo(){
+  const { data, error } = await sb.from('shop_info').select('*').eq('id', 1).single();
+  if(error){ console.error(error); cache.shopInfo = {}; return; }
+  cache.shopInfo = data || {};
+}
+async function loadPublicData(){
+  await Promise.all([fetchListings(), fetchHome(), fetchShopInfo()]);
+}
+
+/* ---------------------------------------------------------
+   4. IMAGE HELPERS (resize in-browser, then upload to Storage)
+--------------------------------------------------------- */
+function resizeFileToBlob(file, maxDim, quality){
+  maxDim = maxDim || 1000; quality = quality || 0.75;
+  return new Promise(function(resolve, reject){
+    const reader = new FileReader();
+    reader.onload = function(e){
+      const img = new Image();
+      img.onload = function(){
+        let w = img.width, h = img.height;
+        if(w > h && w > maxDim){ h = Math.round(h * maxDim / w); w = maxDim; }
+        else if(h > maxDim){ w = Math.round(w * maxDim / h); h = maxDim; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        canvas.toBlob(function(blob){ blob ? resolve(blob) : reject(new Error('Could not process image')); }, 'image/jpeg', quality);
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+async function uploadOneImage(file, folder){
+  const blob = await resizeFileToBlob(file, 1100, 0.76);
+  const path = folder + '/' + uid('img') + '.jpg';
+  const { error } = await sb.storage.from('ctbb-media').upload(path, blob, { contentType:'image/jpeg', upsert:false });
+  if(error){ throw error; }
+  const { data } = sb.storage.from('ctbb-media').getPublicUrl(path);
+  return data.publicUrl;
+}
+async function uploadImages(files, folder){
+  const urls = [];
+  for(const f of files){
+    try{ urls.push(await uploadOneImage(f, folder)); }
+    catch(e){ console.error('image upload failed', e); toast('A photo failed to upload: ' + friendlyError(e)); }
+  }
+  return urls;
+}
+
+/* ---------------------------------------------------------
+   5. RENDER: SHELL
+--------------------------------------------------------- */
+function bikeMarkSVG(){
+  return '<svg class="brand-mark" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">'
+  + '<circle cx="12" cy="34" r="8" stroke="currentColor" stroke-width="2.4" class="gearlogo"/>'
+  + '<circle cx="36" cy="34" r="8" stroke="currentColor" stroke-width="2.4" class="gearlogo"/>'
+  + '<path d="M12 34L21 15H29" stroke="currentColor" stroke-width="2.4" class="gearlogo" stroke-linecap="round"/>'
+  + '<path d="M21 15L29 34H12" stroke="currentColor" stroke-width="2.4" class="gearlogo" stroke-linecap="round" stroke-linejoin="round"/>'
+  + '<path d="M29 15L36 34" stroke="currentColor" stroke-width="2.4" class="gearlogo" stroke-linecap="round"/>'
+  + '<circle cx="21" cy="15" r="2.4" fill="currentColor" class="gearlogo"/>'
+  + '</svg>';
+}
+function cableDividerSVG(){
+  let lines = '';
+  for(let i=0;i<14;i++){
+    const x = i*90 - 20;
+    lines += '<line x1="'+x+'" y1="0" x2="'+(x+45)+'" y2="14" stroke="var(--line-strong)" stroke-width="1"/>';
+  }
+  return '<div class="cable-divider"><svg viewBox="0 0 1180 14" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">'+lines+'</svg></div>';
+}
+function gearIconSVG(){
+  return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">'
+  +'<path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="1.7"/>'
+  +'<path d="M19.4 13.5a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V20a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H4a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H10a1.65 1.65 0 001-1.51V4a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V10c.51.16 1.13.51 1.51 1H20a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.5"/>'
+  +'</svg>';
+}
+function renderSetupScreen(){
+  document.getElementById('app').innerHTML =
+    '<div class="setup-screen">'
+    + '<div style="text-align:center;margin:40px 0 24px;">' + bikeMarkSVG().replace('width="38" height="38"','width="56" height="56"') + '<h1 style="margin-top:10px;">CT Bridge Bikes</h1><p style="color:var(--ink-soft);">Repairing, Selling and Buying Bikes</p></div>'
+    + '<div class="form-card">'
+    + '<h2 style="margin-bottom:14px;">One setup step left</h2>'
+    + '<p style="color:var(--ink-soft);">This site is ready to go live, it just needs to be connected to your database. Open <code>index.html</code> in a text editor, find the <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code> lines near the top of the <code>&lt;script&gt;</code>, and paste in your project\'s values.</p>'
+    + '<p style="color:var(--ink-soft);">Full step-by-step instructions, including the one-time database setup script, are in <code>DEPLOY.md</code>.</p>'
+    + '</div></div>';
+}
+
+function renderShell(){
+  const u = currentUser();
+  const tabs = [
+    {id:'home', label:'Home'},
+    {id:'bikes', label:'Bikes'},
+    {id:'scooters', label:'Scooters'}
+  ];
+  if(u && u.role==='admin'){ tabs.push({id:'sell', label:'Sell a Bike'}); tabs.push({id:'mylistings', label:'My Listings'}); }
+
+  let tabsHtml = tabs.map(function(t){
+    const active = (route.tab===t.id) ? 'active' : '';
+    return '<button class="'+active+'" data-action="nav" data-tab="'+t.id+'">'+t.label+'</button>';
+  }).join('');
+
+  let accountHtml;
+  if(u){
+    accountHtml = '<span class="badge '+(u.role==='admin'?'admin':'')+'" style="margin-right:6px;">'+escapeHtml(u.username)+(u.role==='admin'?' \u00b7 Owner':'')+'</span>'
+      + '<button class="btn ghost small" data-action="logout">Log out</button>';
+  } else {
+    accountHtml = '<button class="btn ghost small" data-action="open-login">Log in</button>'
+      + '<button class="btn small" data-action="open-signup">Sign up</button>';
+  }
+
+  const header =
+    '<header class="site-head">'
+    + '<div class="head-row">'
+    +   '<div class="brand" data-action="nav" data-tab="home">' + bikeMarkSVG()
+    +     '<div class="brand-text"><div class="name">CT Bridge Bikes</div><div class="tag">Repairing, Selling and Buying Bikes</div></div>'
+    +   '</div>'
+    +   '<nav class="tabs">'+tabsHtml+'</nav>'
+    +   '<div class="head-actions">'
+    +      accountHtml
+    +      '<button class="icon-btn" data-action="open-settings" title="Settings" aria-label="Settings">'+gearIconSVG()+'</button>'
+    +   '</div>'
+    + '</div>'
+    + cableDividerSVG()
+    + '</header>';
+
+  const footer =
+    '<footer class="site-foot"><div class="wrap foot-grid">'
+    + '<div><strong>CT Bridge Bikes</strong><br>Repairing, Selling and Buying Bikes</div>'
+    + '<div><strong>Visit</strong><br>'+escapeHtml(cache.shopInfo.location||'\u2014')+'<br>'+escapeHtml(cache.shopInfo.hours||'')+'</div>'
+    + '<div><strong>Contact</strong><br>'+escapeHtml(cache.shopInfo.email||'\u2014')+'<br>'+escapeHtml(cache.shopInfo.phone||'')+'</div>'
+    + '</div></footer>';
+
+  document.getElementById('app').innerHTML = header + '<main id="main"></main>' + footer;
+  renderMain();
+}
+
+/* ---------------------------------------------------------
+   6. RENDER: MAIN ROUTES
+--------------------------------------------------------- */
+function renderMain(){
+  const main = document.getElementById('main');
+  if(route.tab==='home') main.innerHTML = renderHomeTab();
+  else if(route.tab==='bikes') main.innerHTML = renderCatalogTab('bike','Bikes','Refurbished, ready to ride.');
+  else if(route.tab==='scooters') main.innerHTML = renderCatalogTab('scooter','Scooters','Light, quick, and city-ready.');
+  else if(route.tab==='listing') main.innerHTML = renderListingDetail(route.listingId);
+  else if(route.tab==='sell') main.innerHTML = renderSellForm();
+  else if(route.tab==='mylistings') main.innerHTML = renderMyListings();
+  else main.innerHTML = renderHomeTab();
+
+  if(route.tab==='sell') attachSellFormPreview();
+}
+
+function renderHomeTab(){
+  const editing = uiCache.editingHome && isAdmin();
+  const blocks = editing ? uiCache.homeDraft : cache.home;
+
+  let blocksHtml = blocks.map(function(b, i){
+    const controls = editing ? renderBlockControls(i, blocks.length) : '';
+    const cls = editing ? 'hp-block editing' : 'hp-block';
+    let inner = '';
+    if(b.type==='heading'){
+      inner = '<h1 class="hp-heading" '+(editing?'contenteditable="true" data-hb="'+i+'"':'')+'>'+escapeHtml(b.content)+'</h1>';
+    } else if(b.type==='text'){
+      inner = '<div class="wrap"><p class="hp-text" '+(editing?'contenteditable="true" data-hb="'+i+'"':'')+'>'+escapeHtml(b.content)+'</p></div>';
+    } else if(b.type==='image'){
+      inner = '<div class="wrap hp-image">' + (b.content
+          ? '<img src="'+b.content+'" alt="">'
+          : '<div class="thumb-empty" style="border-radius:14px;aspect-ratio:16/6;">No image yet</div>')
+        + (editing ? '<div style="text-align:center;margin-top:8px;"><button class="btn ghost small" data-action="hb-replace-image" data-idx="'+i+'">Replace Image</button></div>' : '')
+        + '</div>';
+    } else if(b.type==='divider'){
+      inner = '<div class="wrap hp-divider"><hr class="rule"></div>';
+    }
+    return '<div class="'+cls+'">' + controls + inner + '</div>';
+  }).join('');
+
+  let editBar = '';
+  if(isAdmin()){
+    if(editing){
+      editBar = '<div class="wrap add-block-bar">'
+        + '<button class="btn small" data-action="hb-add" data-type="heading">+ Heading</button>'
+        + '<button class="btn small" data-action="hb-add" data-type="text">+ Paragraph</button>'
+        + '<button class="btn small" data-action="hb-add" data-type="image">+ Image</button>'
+        + '<button class="btn ghost small" data-action="hb-add" data-type="divider">+ Divider</button>'
+        + '<span style="flex-basis:100%;height:0;"></span>'
+        + '<button class="btn secondary" data-action="hb-save">Save Page</button>'
+        + '<button class="btn ghost" data-action="hb-cancel">Cancel</button>'
+        + '</div>';
+    } else {
+      editBar = '<div class="wrap" style="text-align:center;padding:14px 0 34px;">'
+        + '<button class="btn secondary" data-action="hb-edit">Edit Home Page</button>'
+        + '</div>';
+    }
+  }
+
+  return '<div class="hero">' + (blocksHtml || '<div class="empty-state">Home page is empty.</div>') + '</div>' + editBar + renderFeaturedStrip();
+}
+function renderBlockControls(i, total){
+  return '<div class="edit-controls">'
+    + '<button data-action="hb-up" data-idx="'+i+'" '+(i===0?'disabled':'')+'>&uarr; Up</button>'
+    + '<button data-action="hb-down" data-idx="'+i+'" '+(i===total-1?'disabled':'')+'>&darr; Down</button>'
+    + '<button data-action="hb-delete" data-idx="'+i+'">Delete</button>'
+    + '</div>';
+}
+function renderFeaturedStrip(){
+  const featured = cache.listings.filter(l=>!l.sold).slice(0,3);
+  if(!featured.length) return '';
+  return '<div class="wrap section-tight"><span class="eyebrow">Just Listed</span>'
+    + '<div class="grid">' + featured.map(renderListingCard).join('') + '</div></div>';
+}
+
+function renderCatalogTab(category, title, subtitle){
+  const items = cache.listings.filter(l=>l.category===category);
+  const body = items.length
+    ? '<div class="grid">' + items.map(renderListingCard).join('') + '</div>'
+    : '<div class="empty-state">No '+title.toLowerCase()+' listed yet. Check back soon.</div>';
+  return '<div class="wrap section">'
+    + '<span class="eyebrow">'+items.length+' available</span>'
+    + '<h2 style="font-size:32px;margin-bottom:4px;">'+title+'</h2>'
+    + '<p style="color:var(--ink-soft);margin:0 0 24px;">'+subtitle+'</p>'
+    + body + '</div>';
+}
+function avgRating(l){
+  if(!l.reviews || !l.reviews.length) return null;
+  const sum = l.reviews.reduce((a,r)=>a+r.rating,0);
+  return sum / l.reviews.length;
+}
+function starsHtml(avg, count){
+  if(avg===null) return '<span class="stars" style="color:var(--ink-soft);">No reviews yet</span>';
+  const full = Math.round(avg);
+  let s = '';
+  for(let i=1;i<=5;i++) s += (i<=full) ? '&#9733;' : '&#9734;';
+  return '<span class="stars">'+s+'</span> <span style="color:var(--ink-soft);font-size:12px;">('+count+')</span>';
+}
+function renderListingCard(l){
+  const img = l.images && l.images[0];
+  const avg = avgRating(l);
+  return '<div class="card" data-action="open-listing" data-id="'+l.id+'" style="cursor:pointer;">'
+    + '<div class="card-media">'
+    +   (l.sold ? '<div class="sold-ribbon">SOLD</div>' : '')
+    +   (img ? '<img class="thumb" src="'+img+'" alt="">' : '<div class="thumb-empty">No photo</div>')
+    + '</div>'
+    + '<div class="card-body">'
+    +   '<div class="card-title">'+escapeHtml(l.title)+'</div>'
+    +   '<div>'+starsHtml(avg, (l.reviews||[]).length)+'</div>'
+    +   '<div class="card-meta"><span class="hangtag">'+fmtPrice(l.price)+'</span><span>'+escapeHtml(l.category==='bike'?'Bike':'Scooter')+'</span></div>'
+    + '</div>'
+    + '</div>';
+}
+
+function renderListingDetail(id){
+  const l = cache.listings.find(x=>x.id===id);
+  if(!l) return '<div class="wrap section"><div class="empty-state">Listing not found.<br><button class="btn" data-action="nav" data-tab="bikes">Back to Bikes</button></div></div>';
+
+  const imgs = (l.images && l.images.length) ? l.images : [];
+  const gi = Math.min(uiCache.galleryIndex||0, Math.max(imgs.length-1,0));
+  const mainImg = imgs.length ? imgs[gi] : null;
+
+  const gallery = '<div>'
+    + (mainImg ? '<img class="gallery-main" src="'+mainImg+'" alt="">' : '<div class="thumb-empty" style="border-radius:12px;aspect-ratio:4/3;">No photo</div>')
+    + (imgs.length>1 ? '<div class="gallery-thumbs">' + imgs.map((src,i)=>'<img src="'+src+'" class="'+(i===gi?'active':'')+'" data-action="gallery-select" data-idx="'+i+'">').join('') + '</div>' : '')
+    + '</div>';
+
+  const avg = avgRating(l);
+  const owner = currentUser() && (currentUser().username === l.seller || isAdmin());
+
+  let manageBtns = '';
+  if(owner){
+    manageBtns = '<div style="display:flex;gap:8px;margin-top:14px;">'
+      + '<button class="btn ghost small" data-action="toggle-sold" data-id="'+l.id+'">'+(l.sold?'Mark Available':'Mark as Sold')+'</button>'
+      + '<button class="btn danger small" data-action="delete-listing" data-id="'+l.id+'">Delete Listing</button>'
+      + '</div>';
+  }
+
+  let buyBox = '';
+  if(!l.sold){
+    buyBox = '<div class="form-card" style="margin-top:20px;padding:20px;">'
+      + '<h3 style="margin-bottom:10px;">Interested?</h3>'
+      + '<p style="color:var(--ink-soft);font-size:14px;margin:0 0 14px;">Reserve this '+ (l.category==='bike'?'bike':'scooter') +' and we\'ll contact you to arrange pickup and payment.</p>'
+      + (l.reserved_by
+          ? '<div class="badge" style="margin-bottom:10px;">Reserved by '+escapeHtml(l.reserved_by)+'</div><br>'
+          : '')
+      + '<button class="btn" data-action="reserve-listing" data-id="'+l.id+'">Reserve This '+(l.category==='bike'?'Bike':'Scooter')+'</button>'
+      + '</div>';
+  } else {
+    buyBox = '<div class="badge" style="margin-top:20px;">This item has been sold</div>';
+  }
+
+  const reviewsHtml = renderReviews(l);
+
+  return '<div class="wrap section">'
+    + '<button class="btn ghost small" data-action="nav" data-tab="'+(l.category==='bike'?'bikes':'scooters')+'" style="margin-bottom:20px;">&larr; Back</button>'
+    + '<div class="detail-grid">'
+    +   '<div>' + gallery + '</div>'
+    +   '<div>'
+    +     '<span class="eyebrow">'+ (l.category==='bike'?'Bike':'Scooter') +'</span>'
+    +     '<h1 style="font-size:30px;">'+escapeHtml(l.title)+'</h1>'
+    +     '<div style="margin:10px 0;">'+starsHtml(avg,(l.reviews||[]).length)+'</div>'
+    +     '<div class="hangtag" style="font-size:20px;margin-bottom:16px;">'+fmtPrice(l.price)+'</div>'
+    +     (l.condition ? '<div class="badge" style="margin-bottom:12px;">'+escapeHtml(l.condition)+'</div>' : '')
+    +     '<p style="color:var(--ink);white-space:pre-wrap;">'+escapeHtml(l.description)+'</p>'
+    +     '<p style="color:var(--ink-soft);font-size:13px;">Listed by '+escapeHtml(l.seller)+' on '+fmtDate(l.created_at)+'</p>'
+    +     manageBtns + buyBox
+    +   '</div>'
+    + '</div>'
+    + '<hr class="rule">'
+    + reviewsHtml
+    + '</div>';
+}
+function renderReviews(l){
+  const u = currentUser();
+  let formHtml = '';
+  if(u){
+    formHtml = '<form id="review-form" data-id="'+l.id+'" style="max-width:480px;margin-bottom:20px;">'
+      + '<label>Your rating</label>'
+      + '<div class="star-picker" id="star-picker">' + [1,2,3,4,5].map(n=>'<button type="button" class="on" data-action="pick-star" data-val="'+n+'">&#9733;</button>').join('') + '</div>'
+      + '<input type="hidden" name="rating" id="rating-input" value="5">'
+      + '<label style="margin-top:12px;">Your review</label>'
+      + '<textarea name="comment" placeholder="How was the bike / the buying experience?" required></textarea>'
+      + '<button class="btn" type="submit">Post Review</button>'
+      + '</form>';
+  } else {
+    formHtml = '<p class="helptext">Log in to leave a review.</p>';
+  }
+  const list = (l.reviews||[]).map(function(r){
+    let s=''; for(let i=1;i<=5;i++) s += i<=r.rating?'&#9733;':'&#9734;';
+    return '<div class="review"><div class="review-head"><strong style="color:var(--ink);">'+escapeHtml(r.username)+'</strong><span>'+fmtDate(r.created_at)+'</span></div>'
+      + '<div class="stars">'+s+'</div><p style="margin:6px 0 0;">'+nl2br(r.comment)+'</p></div>';
+  }).join('') || '<p class="helptext">No reviews yet \u2014 be the first.</p>';
+
+  return '<h3>Reviews</h3>' + formHtml + list;
+}
+
+function renderSellForm(){
+  if(!isAdmin()) return accessDeniedBlock();
+  return '<div class="wrap section">'
+    + '<span class="eyebrow">Owner Tools</span>'
+    + '<h2 style="margin-bottom:20px;">List a New Bike or Scooter</h2>'
+    + '<form id="sell-form" class="form-card">'
+    +   '<label>Category</label>'
+    +   '<select name="category"><option value="bike">Bike</option><option value="scooter">Scooter</option></select>'
+    +   '<label>Title</label>'
+    +   '<input type="text" name="title" placeholder="e.g. Refurbished Trek 820 Mountain Bike" required>'
+    +   '<div class="field-row"><div>'
+    +     '<label>Price (USD)</label><input type="number" name="price" min="0" step="1" placeholder="245" required>'
+    +   '</div><div>'
+    +     '<label>Condition (optional)</label><input type="text" name="condition" placeholder="e.g. Refurbished, Like New, Used">'
+    +   '</div></div>'
+    +   '<label>Description</label>'
+    +   '<textarea name="description" placeholder="Frame size, condition, what was serviced, fit notes..." required></textarea>'
+    +   '<label>Photos</label>'
+    +   '<div class="upload-box" data-action="trigger-file"><input type="file" id="sell-images" accept="image/*" multiple style="display:none;">Click to upload photo(s)</div>'
+    +   '<div class="preview-row" id="sell-preview"></div>'
+    +   '<button class="btn" type="submit" id="sell-submit-btn">Publish Listing</button>'
+    + '</form></div>';
+}
+function accessDeniedBlock(){
+  return '<div class="wrap section"><div class="empty-state">This page is only available to CT Bridge Bikes owner accounts.</div></div>';
+}
+function renderMyListings(){
+  if(!isAdmin()) return accessDeniedBlock();
+  const rows = cache.listings.map(function(l){
+    return '<div class="card" style="flex-direction:row;align-items:center;gap:12px;padding:10px;" >'
+      + (l.images && l.images[0] ? '<img src="'+l.images[0]+'" style="width:64px;height:64px;object-fit:cover;border-radius:8px;">' : '<div class="thumb-empty" style="width:64px;height:64px;border-radius:8px;"></div>')
+      + '<div style="flex:1;padding:0 10px;"><strong>'+escapeHtml(l.title)+'</strong><br><span class="helptext" style="margin:0;">'+fmtPrice(l.price)+' &middot; '+(l.sold?'Sold':'Available')+' &middot; by '+escapeHtml(l.seller)+'</span></div>'
+      + '<button class="btn ghost small" data-action="open-listing" data-id="'+l.id+'">View</button>'
+      + '<button class="btn danger small" data-action="delete-listing" data-id="'+l.id+'">Delete</button>'
+      + '</div>';
+  }).join('') || '<div class="empty-state">No listings yet.</div>';
+  return '<div class="wrap section"><span class="eyebrow">Owner Tools</span><h2 style="margin-bottom:20px;">All Listings</h2>'
+    + '<div style="display:flex;flex-direction:column;gap:10px;">' + rows + '</div></div>';
+}
+
+/* ---------------------------------------------------------
+   7. MODALS
+--------------------------------------------------------- */
+function openModal(html){
+  document.getElementById('modal-root').innerHTML =
+    '<div class="overlay" data-action="close-modal-bg"><div class="modal" id="modal-box">'
+    + '<button class="modal-close" data-action="close-modal">&times;</button>'
+    + html + '</div></div>';
+}
+function closeModal(){ document.getElementById('modal-root').innerHTML = ''; }
+
+function openLoginModal(){
+  openModal(
+    '<h2 style="margin-bottom:18px;">Log In</h2>'
+    + '<form id="login-form">'
+    +   '<label>Username</label><input type="text" name="username" required>'
+    +   '<label>Password</label><input type="password" name="password" required>'
+    +   '<button class="btn" type="submit" style="width:100%;" id="login-btn">Log In</button>'
+    + '</form>'
+    + '<p class="helptext" style="margin-top:14px;">No account? <a href="#" data-action="switch-signup">Sign up</a></p>'
+  );
+}
+function openSignupModal(){
+  openModal(
+    '<h2 style="margin-bottom:18px;">Create a Customer Account</h2>'
+    + '<form id="signup-form">'
+    +   '<label>Choose a username</label><input type="text" name="username" required minlength="3">'
+    +   '<label>Password</label><input type="password" name="password" required minlength="6">'
+    +   '<button class="btn" type="submit" style="width:100%;" id="signup-btn">Sign Up</button>'
+    + '</form>'
+    + '<p class="helptext" style="margin-top:14px;">Customer accounts can browse, reserve items, and leave reviews. Selling access is limited to CT Bridge Bikes owner accounts.</p>'
+  );
+}
+function openSettingsModal(){
+  const u = currentUser();
+  let adminSection = '';
+  if(u && u.role==='admin'){
+    adminSection = '<hr class="rule"><h3>Shop Contact Info</h3>'
+      + '<form id="shopinfo-form">'
+      +  '<label>Email</label><input type="text" name="email" value="'+escapeHtml(cache.shopInfo.email||'')+'">'
+      +  '<label>Phone</label><input type="text" name="phone" value="'+escapeHtml(cache.shopInfo.phone||'')+'">'
+      +  '<label>Location</label><input type="text" name="location" value="'+escapeHtml(cache.shopInfo.location||'')+'">'
+      +  '<label>Hours</label><input type="text" name="hours" value="'+escapeHtml(cache.shopInfo.hours||'')+'">'
+      +  '<button class="btn secondary" type="submit">Save Shop Info</button>'
+      + '</form>';
+  }
+  let acctSection = '';
+  if(u){
+    acctSection = '<hr class="rule"><h3>Change Password</h3>'
+      + '<form id="password-form">'
+      +   '<label>Current password</label><input type="password" name="current" required>'
+      +   '<label>New password</label><input type="password" name="next" required minlength="6">'
+      +   '<button class="btn secondary" type="submit">Update Password</button>'
+      + '</form>';
+  }
+  openModal(
+    '<h2 style="margin-bottom:10px;">Settings</h2>'
+    + '<div class="settings-row"><span>Dark mode</span>'
+    +   '<div class="switch"><div class="switch-track" data-action="toggle-theme"><div class="switch-thumb"></div></div></div>'
+    + '</div>'
+    + adminSection + acctSection
+  );
+}
+
+/* ---------------------------------------------------------
+   8. ACTIONS: auth
+--------------------------------------------------------- */
+async function doLogin(username, password){
+  const email = usernameToEmail(username);
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if(error){ toast(friendlyError(error)); return false; }
+  await refreshSession();
+  toast('Welcome back, ' + cache.profile.username + '.');
+  return true;
+}
+async function doSignup(username, password){
+  username = username.trim();
+  if(!/^[a-zA-Z0-9_. -]{3,30}$/.test(username)){ toast('Please use a simple username (letters, numbers, spaces, 3-30 chars).'); return false; }
+  const { data: existing } = await sb.from('profiles').select('username').ilike('username', username).maybeSingle();
+  if(existing){ toast('That username is already taken.'); return false; }
+  const email = usernameToEmail(username);
+  const { error } = await sb.auth.signUp({ email, password, options:{ data:{ username: username } } });
+  if(error){ toast(friendlyError(error)); return false; }
+  await refreshSession();
+  if(!cache.profile){
+    toast('Account created. If your project has email confirmation turned on, turn it off in Supabase (see DEPLOY.md) so sign-up logs you straight in.');
+    return false;
+  }
+  toast('Account created \u2014 welcome, ' + username + '.');
+  return true;
+}
+async function doLogout(){
+  await sb.auth.signOut();
+  cache.session = null; cache.profile = null;
+  route = {tab:'home', listingId:null};
+  toast('Logged out.');
+}
+
+/* ---------------------------------------------------------
+   9. ACTIONS: home page editing
+--------------------------------------------------------- */
+function startHomeEdit(){
+  uiCache.editingHome = true;
+  uiCache.homeDraft = cache.home.map(b=>Object.assign({}, b));
+  renderMain();
+}
+function cancelHomeEdit(){
+  uiCache.editingHome = false;
+  uiCache.homeDraft = null;
+  renderMain();
+}
+function syncDraftFromDom(){
+  document.querySelectorAll('[data-hb]').forEach(function(el){
+    const idx = Number(el.getAttribute('data-hb'));
+    if(uiCache.homeDraft[idx]) uiCache.homeDraft[idx].content = el.textContent.trim();
+  });
+}
+async function saveHomeEdit(){
+  syncDraftFromDom();
+  const draft = uiCache.homeDraft;
+  setBusy(true);
+  try{
+    const { error: delErr } = await sb.from('home_blocks').delete().gte('position', -1);
+    if(delErr) throw delErr;
+    if(draft.length){
+      const rows = draft.map((b,i)=>({ position:i, type:b.type, content:b.content||'' }));
+      const { error: insErr } = await sb.from('home_blocks').insert(rows);
+      if(insErr) throw insErr;
+    }
+    await fetchHome();
+    uiCache.editingHome = false;
+    uiCache.homeDraft = null;
+    toast('Home page saved.');
+  }catch(e){ toast('Could not save: ' + friendlyError(e)); }
+  setBusy(false);
+  renderMain();
+}
+function addHomeBlock(type){
+  syncDraftFromDom();
+  uiCache.homeDraft.push({ type:type, content: type==='heading' ? 'New Heading' : (type==='text' ? 'New paragraph text \u2014 click to edit.' : '') });
+  renderMain();
+}
+function moveHomeBlock(idx, dir){
+  syncDraftFromDom();
+  const arr = uiCache.homeDraft;
+  const j = idx + dir;
+  if(j<0 || j>=arr.length) return;
+  const tmp = arr[idx]; arr[idx] = arr[j]; arr[j] = tmp;
+  renderMain();
+}
+function deleteHomeBlock(idx){
+  syncDraftFromDom();
+  uiCache.homeDraft.splice(idx,1);
+  renderMain();
+}
+async function replaceHomeImage(idx, file){
+  syncDraftFromDom();
+  setBusy(true);
+  try{
+    const url = await uploadOneImage(file, 'home');
+    uiCache.homeDraft[idx].content = url;
+  }catch(e){ toast('Upload failed: ' + friendlyError(e)); }
+  setBusy(false);
+  renderMain();
+}
+
+/* ---------------------------------------------------------
+   10. ACTIONS: listings
+--------------------------------------------------------- */
+function attachSellFormPreview(){
+  uiCache.pendingFiles = [];
+  uiCache.pendingPreviewUrls.forEach(u=>URL.revokeObjectURL(u));
+  uiCache.pendingPreviewUrls = [];
+  const input = document.getElementById('sell-images');
+  if(!input) return;
+  input.addEventListener('change', function(){
+    Array.from(input.files).forEach(function(f){
+      uiCache.pendingFiles.push(f);
+      uiCache.pendingPreviewUrls.push(URL.createObjectURL(f));
+    });
+    input.value = '';
+    renderSellPreview();
+  });
+}
+function renderSellPreview(){
+  const wrap = document.getElementById('sell-preview');
+  if(!wrap) return;
+  wrap.innerHTML = uiCache.pendingPreviewUrls.map(function(src,i){
+    return '<div class="preview-thumb"><img src="'+src+'"><button type="button" class="rm" data-action="rm-preview" data-idx="'+i+'">&times;</button></div>';
+  }).join('');
+}
+function setBusy(b){ uiCache.busy = b; }
+async function createListing(data){
+  setBusy(true);
+  const btn = document.getElementById('sell-submit-btn');
+  if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Publishing\u2026'; }
+  try{
+    const { data: row, error } = await sb.from('listings').insert({
+      category: data.category, title: data.title.trim(), price: Number(data.price)||0,
+      description: data.description.trim(), condition: (data.condition||'').trim(),
+      seller: cache.profile.username
+    }).select().single();
+    if(error) throw error;
+
+    if(uiCache.pendingFiles.length){
+      const urls = await uploadImages(uiCache.pendingFiles, 'listings');
+      if(urls.length){
+        const rows = urls.map((url,i)=>({ listing_id: row.id, url, position:i }));
+        const { error: imgErr } = await sb.from('listing_images').insert(rows);
+        if(imgErr) console.error(imgErr);
+      }
+    }
+    uiCache.pendingFiles = [];
+    uiCache.pendingPreviewUrls.forEach(u=>URL.revokeObjectURL(u));
+    uiCache.pendingPreviewUrls = [];
+    await fetchListings();
+    toast('Listing published.');
+    route = { tab:'listing', listingId: row.id };
+    renderShell();
+  }catch(e){
+    toast('Could not publish listing: ' + friendlyError(e));
+    if(btn){ btn.disabled = false; btn.textContent = 'Publish Listing'; }
+  }
+  setBusy(false);
+}
+async function deleteListing(id){
+  if(!confirm('Delete this listing? This cannot be undone.')) return;
+  const { error } = await sb.from('listings').delete().eq('id', id);
+  if(error){ toast('Could not delete: ' + friendlyError(error)); return; }
+  await fetchListings();
+  route = { tab: route.tab==='listing' ? 'mylistings' : route.tab, listingId:null };
+  toast('Listing deleted.');
+  renderShell();
+}
+async function toggleSold(id){
+  const l = cache.listings.find(x=>x.id===id);
+  if(!l) return;
+  const { error } = await sb.from('listings').update({ sold: !l.sold }).eq('id', id);
+  if(error){ toast('Could not update: ' + friendlyError(error)); return; }
+  await fetchListings();
+  renderMain();
+}
+async function reserveListing(id){
+  const u = currentUser();
+  if(!u){ openLoginModal(); toast('Log in to reserve this item.'); return; }
+  const { error } = await sb.rpc('reserve_listing', { p_listing_id: id });
+  if(error){ toast('Could not reserve: ' + friendlyError(error)); return; }
+  await fetchListings();
+  const contact = cache.shopInfo.email || cache.shopInfo.phone || 'the shop';
+  openModal('<h2>Reserved</h2><p>Thanks, '+escapeHtml(u.username)+'! This item is reserved under your account. '
+    + 'The shop will reach out via '+escapeHtml(contact)+' to arrange pickup and payment.</p>'
+    + '<button class="btn" data-action="close-modal">Done</button>');
+  renderMain();
+}
+async function postReview(listingId, rating, comment){
+  const u = currentUser();
+  if(!u) return;
+  const { error } = await sb.from('reviews').insert({
+    listing_id: listingId, user_id: cache.session.user.id, username: u.username,
+    rating: Number(rating)||5, comment: comment.trim()
+  });
+  if(error){ toast('Could not post review: ' + friendlyError(error)); return; }
+  await fetchListings();
+  toast('Review posted.');
+  renderMain();
+}
+
+/* ---------------------------------------------------------
+   11. EVENT DELEGATION
+--------------------------------------------------------- */
+document.addEventListener('click', function(e){
+  const t = e.target.closest('[data-action]');
+  if(!t) return;
+  const action = t.getAttribute('data-action');
+
+  switch(action){
+    case 'nav':
+      route = { tab: t.getAttribute('data-tab'), listingId:null };
+      uiCache.galleryIndex = 0;
+      renderShell();
+      loadPublicData().then(renderMain);
+      break;
+    case 'open-listing':
+      route = { tab:'listing', listingId: t.getAttribute('data-id') };
+      uiCache.galleryIndex = 0;
+      renderShell();
+      break;
+    case 'gallery-select':
+      uiCache.galleryIndex = Number(t.getAttribute('data-idx'));
+      renderMain();
+      break;
+    case 'open-login': openLoginModal(); break;
+    case 'open-signup': openSignupModal(); break;
+    case 'switch-signup': openSignupModal(); break;
+    case 'open-settings': openSettingsModal(); break;
+    case 'close-modal': closeModal(); break;
+    case 'close-modal-bg': if(e.target.classList.contains('overlay')) closeModal(); break;
+    case 'logout': doLogout().then(renderShell); break;
+    case 'toggle-theme': toggleTheme(); break;
+
+    case 'hb-edit': startHomeEdit(); break;
+    case 'hb-cancel': cancelHomeEdit(); break;
+    case 'hb-save': saveHomeEdit(); break;
+    case 'hb-add': addHomeBlock(t.getAttribute('data-type')); break;
+    case 'hb-up': moveHomeBlock(Number(t.getAttribute('data-idx')), -1); break;
+    case 'hb-down': moveHomeBlock(Number(t.getAttribute('data-idx')), 1); break;
+    case 'hb-delete': deleteHomeBlock(Number(t.getAttribute('data-idx'))); break;
+    case 'hb-replace-image': {
+      const idx = Number(t.getAttribute('data-idx'));
+      const inp = document.createElement('input');
+      inp.type='file'; inp.accept='image/*';
+      inp.onchange = function(){ if(inp.files[0]) replaceHomeImage(idx, inp.files[0]); };
+      inp.click();
+      break;
+    }
+
+    case 'trigger-file': {
+      const inp = t.querySelector('input[type=file]');
+      if(inp) inp.click();
+      break;
+    }
+    case 'rm-preview': {
+      const idx = Number(t.getAttribute('data-idx'));
+      URL.revokeObjectURL(uiCache.pendingPreviewUrls[idx]);
+      uiCache.pendingFiles.splice(idx,1);
+      uiCache.pendingPreviewUrls.splice(idx,1);
+      renderSellPreview();
+      break;
+    }
+    case 'toggle-sold': toggleSold(t.getAttribute('data-id')); break;
+    case 'delete-listing': deleteListing(t.getAttribute('data-id')); break;
+    case 'reserve-listing': reserveListing(t.getAttribute('data-id')); break;
+    case 'pick-star': {
+      const val = t.getAttribute('data-val');
+      document.getElementById('rating-input').value = val;
+      document.querySelectorAll('#star-picker button').forEach(function(b,i){
+        b.classList.toggle('on', (i+1) <= Number(val));
+      });
+      break;
+    }
+  }
+});
+
+document.addEventListener('submit', function(e){
+  const form = e.target;
+  e.preventDefault();
+
+  if(form.id === 'login-form'){
+    const fd = new FormData(form);
+    const btn = document.getElementById('login-btn');
+    if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Logging in\u2026'; }
+    doLogin(fd.get('username'), fd.get('password')).then(function(ok){
+      if(ok){ closeModal(); renderShell(); }
+      else if(btn){ btn.disabled = false; btn.textContent = 'Log In'; }
+    });
+  }
+  else if(form.id === 'signup-form'){
+    const fd = new FormData(form);
+    const btn = document.getElementById('signup-btn');
+    if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Signing up\u2026'; }
+    doSignup(fd.get('username'), fd.get('password')).then(function(ok){
+      if(ok){ closeModal(); renderShell(); }
+      else if(btn){ btn.disabled = false; btn.textContent = 'Sign Up'; }
+    });
+  }
+  else if(form.id === 'password-form'){
+    const fd = new FormData(form);
+    const u = currentUser();
+    if(!u) return;
+    (async function(){
+      const email = usernameToEmail(u.username);
+      const { error: verifyErr } = await sb.auth.signInWithPassword({ email, password: fd.get('current') });
+      if(verifyErr){ toast('Current password is incorrect.'); return; }
+      const { error } = await sb.auth.updateUser({ password: fd.get('next') });
+      if(error){ toast('Could not update password: ' + friendlyError(error)); return; }
+      toast('Password updated.');
+      closeModal();
+    })();
+  }
+  else if(form.id === 'shopinfo-form'){
+    const fd = new FormData(form);
+    (async function(){
+      const { error } = await sb.from('shop_info').update({
+        email: fd.get('email'), phone: fd.get('phone'), location: fd.get('location'), hours: fd.get('hours')
+      }).eq('id', 1);
+      if(error){ toast('Could not save: ' + friendlyError(error)); return; }
+      await fetchShopInfo();
+      toast('Shop info updated.');
+      closeModal();
+      renderShell();
+    })();
+  }
+  else if(form.id === 'sell-form'){
+    if(!uiCache.pendingFiles.length && !confirm('Publish this listing without any photos?')) return;
+    const fd = new FormData(form);
+    createListing({
+      category: fd.get('category'), title: fd.get('title'), price: fd.get('price'),
+      description: fd.get('description'), condition: fd.get('condition')
+    });
+  }
+  else if(form.id === 'review-form'){
+    const fd = new FormData(form);
+    postReview(form.getAttribute('data-id'), fd.get('rating'), fd.get('comment'));
+    form.reset();
+  }
+});
+
+/* ---------------------------------------------------------
+   12. THEME
+--------------------------------------------------------- */
+function applyTheme(){ document.documentElement.setAttribute('data-theme', settings.theme==='dark' ? 'dark' : 'light'); }
+function toggleTheme(){
+  settings.theme = settings.theme==='dark' ? 'light' : 'dark';
+  localStorage.setItem('ctbb_theme', settings.theme);
+  applyTheme();
+}
+
+/* ---------------------------------------------------------
+   13. INIT
+--------------------------------------------------------- */
+async function init(){
+  applyTheme();
+  if(NOT_CONFIGURED){ renderSetupScreen(); return; }
+
+  document.getElementById('app').innerHTML = '<div class="empty-state" style="padding:120px 20px;"><span class="spinner" style="width:20px;height:20px;color:var(--ink);"></span> Loading CT Bridge Bikes\u2026</div>';
+
+  try{
+    await refreshSession();
+    await loadPublicData();
+  }catch(e){
+    console.error(e);
+  }
+
+  sb.auth.onAuthStateChange(function(){ /* session is re-read via refreshSession() around actions; nothing to do here */ });
+
+  renderShell();
+}
+init();
+
+})();
+</script>
+</body>
+</html>
