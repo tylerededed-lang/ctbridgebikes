@@ -763,6 +763,7 @@ function openLoginModal(){
     +   '<label>Password</label><input type="password" name="password" required>'
     +   '<button class="btn" type="submit" style="width:100%;" id="login-btn">Log In</button>'
     + '</form>'
+    + oauthButtonsHtml()
     + '<p class="helptext" style="margin-top:14px;">No account? <a href="#" data-action="switch-signup">Sign up</a></p>'
   );
 }
@@ -775,8 +776,18 @@ function openSignupModal(){
     +   '<label>Password</label><input type="password" name="password" required minlength="6">'
     +   '<button class="btn" type="submit" style="width:100%;" id="signup-btn">Sign Up</button>'
     + '</form>'
+    + oauthButtonsHtml()
     + '<p class="helptext" style="margin-top:14px;">Customer accounts can browse, reserve items, and leave reviews. Selling access is limited to CT Bridge Bikes owner accounts.</p>'
   );
+}
+function oauthButtonsHtml(){
+  return '<div style="display:flex;align-items:center;gap:10px;margin:18px 0;color:var(--ink-soft);font-size:12px;">'
+    + '<hr style="flex:1;border:none;border-top:1px solid var(--line);"><span>OR</span><hr style="flex:1;border:none;border-top:1px solid var(--line);">'
+    + '</div>'
+    + '<div style="display:flex;flex-direction:column;gap:10px;">'
+    +   '<button type="button" class="btn ghost" data-action="oauth-login" data-provider="google">Continue with Google</button>'
+    +   '<button type="button" class="btn ghost" data-action="oauth-login" data-provider="azure">Continue with Microsoft</button>'
+    + '</div>';
 }
 function openSettingsModal(){
   const u = currentUser();
@@ -840,6 +851,10 @@ async function doLogout(){
   cache.session = null; cache.profile = null;
   route = {tab:'home', listingId:null};
   toast('Logged out.');
+}
+async function doOAuthLogin(provider){
+  const { error } = await sb.auth.signInWithOAuth({ provider: provider, options: { redirectTo: window.location.origin + window.location.pathname } });
+  if(error){ toast('Could not start sign-in: ' + friendlyError(error)); }
 }
 
 /* ---------------------------------------------------------
@@ -1042,6 +1057,7 @@ document.addEventListener('click', function(e){
     case 'close-modal': closeModal(); break;
     case 'close-modal-bg': if(e.target.classList.contains('overlay')) closeModal(); break;
     case 'logout': doLogout().then(renderShell); break;
+    case 'oauth-login': doOAuthLogin(t.getAttribute('data-provider')); break;
     case 'toggle-theme': toggleTheme(); break;
 
     case 'hb-edit': startHomeEdit(); break;
