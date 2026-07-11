@@ -782,9 +782,9 @@ function renderMyListings(){
 /* ---------------------------------------------------------
    7. MODALS
 --------------------------------------------------------- */
-function openModal(html){
+function openModal(html, lockBackdrop){
   document.getElementById('modal-root').innerHTML =
-    '<div class="overlay" data-action="close-modal-bg"><div class="modal" id="modal-box">'
+    '<div class="overlay" '+(lockBackdrop ? '' : 'data-action="close-modal-bg"')+'><div class="modal" id="modal-box">'
     + '<button class="modal-close" data-action="close-modal">&times;</button>'
     + html + '</div></div>';
 }
@@ -799,7 +799,8 @@ function openLoginModal(){
     +   '<button class="btn" type="submit" style="width:100%;" id="login-btn">Log In</button>'
     + '</form>'
     + oauthButtonsHtml()
-    + '<p class="helptext" style="margin-top:14px;">No account? <a href="#" data-action="switch-signup">Sign up</a></p>'
+    + '<p class="helptext" style="margin-top:14px;">No account? <a href="#" data-action="switch-signup">Sign up</a></p>',
+    true
   );
 }
 function openSignupModal(){
@@ -812,7 +813,8 @@ function openSignupModal(){
     +   '<button class="btn" type="submit" style="width:100%;" id="signup-btn">Sign Up</button>'
     + '</form>'
     + oauthButtonsHtml()
-    + '<p class="helptext" style="margin-top:14px;">Customer accounts can browse, reserve items, and leave reviews. Selling access is limited to CT Bridge Bikes owner accounts.</p>'
+    + '<p class="helptext" style="margin-top:14px;">Customer accounts can browse, reserve items, and leave reviews. Selling access is limited to CT Bridge Bikes owner accounts.</p>',
+    true
   );
 }
 function oauthButtonsHtml(){
@@ -832,7 +834,8 @@ function openVerifyCodeModal(email){
     +   '<label>6-digit code</label><input type="text" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required>'
     +   '<button class="btn" type="submit" style="width:100%;" id="verify-btn">Verify &amp; Continue</button>'
     + '</form>'
-    + '<p class="helptext" style="margin-top:14px;">Didn\'t get it? Check spam, or <a href="#" data-action="resend-code" data-email="'+escapeHtml(email)+'">resend the code</a>.</p>'
+    + '<p class="helptext" style="margin-top:14px;">Didn\'t get it? Check spam, or <a href="#" data-action="resend-code" data-email="'+escapeHtml(email)+'">resend the code</a>.</p>',
+    true
   );
 }
 function openSetPasswordModal(){
