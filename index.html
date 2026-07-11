@@ -295,7 +295,7 @@ function escapeHtml(str){
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 function nl2br(str){ return escapeHtml(str).replace(/\n/g,'<br>'); }
-function fmtPrice(n){ const num = Number(n)||0; return '$' + num.toLocaleString('en-US',{maximumFractionDigits:2}); }
+function fmtPrice(n){ const num = Number(n)||0; return '£' + num.toLocaleString('en-GB',{maximumFractionDigits:2}); }
 function fmtDate(ts){ try{ return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); } catch(e){ return ''; } }
 function toast(msg, ms){
   const el = document.getElementById('toast');
@@ -652,11 +652,14 @@ function renderListingDetail(id){
   if(!l.sold){
     buyBox = '<div class="form-card" style="margin-top:20px;padding:20px;">'
       + '<h3 style="margin-bottom:10px;">Interested?</h3>'
-      + '<p style="color:var(--ink-soft);font-size:14px;margin:0 0 14px;">Reserve this '+ (l.category==='bike'?'bike':'scooter') +' and we\'ll contact you to arrange pickup and payment.</p>'
+      + '<button class="btn" data-action="buy-listing" data-id="'+l.id+'" style="width:100%;margin-bottom:10px;">Buy Now — Pay Online ('+fmtPrice(l.price)+')</button>'
+      + '<p style="color:var(--ink-soft);font-size:12px;margin:0 0 14px;">Secure card payment via Stripe. The listing marks itself sold automatically once payment completes.</p>'
+      + '<hr class="rule" style="margin:14px 0;">'
+      + '<p style="color:var(--ink-soft);font-size:14px;margin:0 0 14px;">Prefer to pay in person instead? Reserve this '+ (l.category==='bike'?'bike':'scooter') +' and we\'ll contact you to arrange pickup and payment.</p>'
       + (l.reserved_by
           ? '<div class="badge" style="margin-bottom:10px;">Reserved by '+escapeHtml(l.reserved_by)+'</div><br>'
           : '')
-      + '<button class="btn" data-action="reserve-listing" data-id="'+l.id+'">Reserve This '+(l.category==='bike'?'Bike':'Scooter')+'</button>'
+      + '<button class="btn ghost" data-action="reserve-listing" data-id="'+l.id+'">Reserve This '+(l.category==='bike'?'Bike':'Scooter')+'</button>'
       + '</div>';
   } else {
     buyBox = '<div class="badge" style="margin-top:20px;">This item has been sold</div>';
@@ -719,7 +722,7 @@ function renderSellForm(){
     +   '<label>Title</label>'
     +   '<input type="text" name="title" placeholder="e.g. Refurbished Trek 820 Mountain Bike" required>'
     +   '<div class="field-row"><div>'
-    +     '<label>Price (USD)</label><input type="number" name="price" min="0" step="1" placeholder="245" required>'
+    +     '<label>Price (GBP)</label><input type="number" name="price" min="0" step="1" placeholder="245" required>'
     +   '</div><div>'
     +     '<label>Condition (optional)</label><input type="text" name="condition" placeholder="e.g. Refurbished, Like New, Used">'
     +   '</div></div>'
@@ -750,7 +753,7 @@ function renderEditListingForm(id){
     +   '<label>Title</label>'
     +   '<input type="text" name="title" value="'+escapeHtml(l.title)+'" required>'
     +   '<div class="field-row"><div>'
-    +     '<label>Price (USD)</label><input type="number" name="price" min="0" step="1" value="'+l.price+'" required>'
+    +     '<label>Price (GBP)</label><input type="number" name="price" min="0" step="1" value="'+l.price+'" required>'
     +   '</div><div>'
     +     '<label>Condition (optional)</label><input type="text" name="condition" value="'+escapeHtml(l.condition||'')+'">'
     +   '</div></div>'
@@ -1117,6 +1120,33 @@ async function reserveListing(id){
     + '<button class="btn" data-action="close-modal">Done</button>');
   renderMain();
 }
+async function buyListing(id){
+  const u = currentUser();
+  if(!u){ openLoginModal(); toast('Log in to buy this item.'); return; }
+  const btn = document.querySelector('[data-action="buy-listing"][data-id="'+id+'"]');
+  if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Redirecting to payment\u2026'; }
+  try{
+    const baseUrl = window.location.origin + window.location.pathname;
+    const { data, error } = await sb.functions.invoke('create-checkout-session', {
+      body: { listing_id: id, success_url: baseUrl + '?purchase=success', cancel_url: baseUrl + '?purchase=cancelled' }
+    });
+    if(error){
+      let msg = error.message;
+      try{
+        if(error.context && typeof error.context.json === 'function'){
+          const body = await error.context.json();
+          if(body && body.error) msg = body.error;
+        }
+      }catch(_e){}
+      throw new Error(msg);
+    }
+    if(data && data.url){ window.location.href = data.url; return; }
+    throw new Error((data && data.error) || 'Could not start checkout.');
+  }catch(e){
+    toast('Could not start checkout: ' + friendlyError(e));
+    if(btn){ btn.disabled = false; btn.textContent = 'Buy Now \u2014 Pay Online'; }
+  }
+}
 async function postReview(listingId, rating, comment){
   const u = currentUser();
   if(!u) return;
@@ -1207,6 +1237,7 @@ document.addEventListener('click', function(e){
     case 'edit-listing': route = { tab:'editlisting', listingId: t.getAttribute('data-id') }; renderShell(); break;
     case 'remove-existing-image': removeExistingImage(t.getAttribute('data-id'), t.getAttribute('data-url')); break;
     case 'reserve-listing': reserveListing(t.getAttribute('data-id')); break;
+    case 'buy-listing': buyListing(t.getAttribute('data-id')); break;
     case 'delete-review': deleteReview(t.getAttribute('data-id')); break;
     case 'pick-star': {
       const val = t.getAttribute('data-val');
@@ -1350,6 +1381,19 @@ async function init(){
   renderShell();
   if(cache.profile && cache.profile.has_password === false){
     openSetPasswordModal();
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  if(params.get('purchase')==='success'){
+    toast('Payment received — thank you! The listing will show as sold shortly.');
+    setTimeout(function(){ loadPublicData().then(renderMain); }, 1500);
+  } else if(params.get('purchase')==='cancelled'){
+    toast('Checkout was cancelled — no payment was taken.');
+  }
+  if(params.has('purchase')){
+    params.delete('purchase');
+    const clean = window.location.pathname + (params.toString() ? '?'+params.toString() : '');
+    window.history.replaceState({}, '', clean);
   }
 }
 init();
