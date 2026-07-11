@@ -349,7 +349,7 @@ async function refreshSession(){
 async function fetchListings(){
   const { data, error } = await sb
     .from('listings')
-    .select('*, listing_images(url, position), reviews(username, rating, comment, created_at)')
+    .select('*, listing_images(url, position), reviews(id, user_id, username, rating, comment, created_at)')
     .order('created_at', { ascending:false });
   if(error){ console.error(error); toast('Could not load listings: ' + friendlyError(error)); cache.listings = []; return; }
   cache.listings = (data||[]).map(function(l){
@@ -517,10 +517,11 @@ function renderMain(){
   else if(route.tab==='scooters') main.innerHTML = renderCatalogTab('scooter','Scooters','Light, quick, and city-ready.');
   else if(route.tab==='listing') main.innerHTML = renderListingDetail(route.listingId);
   else if(route.tab==='sell') main.innerHTML = renderSellForm();
+  else if(route.tab==='editlisting') main.innerHTML = renderEditListingForm(route.listingId);
   else if(route.tab==='mylistings') main.innerHTML = renderMyListings();
   else main.innerHTML = renderHomeTab();
 
-  if(route.tab==='sell') attachSellFormPreview();
+  if(route.tab==='sell' || route.tab==='editlisting') attachSellFormPreview();
 }
 
 function renderHomeTab(){
@@ -639,7 +640,8 @@ function renderListingDetail(id){
 
   let manageBtns = '';
   if(owner){
-    manageBtns = '<div style="display:flex;gap:8px;margin-top:14px;">'
+    manageBtns = '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">'
+      + '<button class="btn ghost small" data-action="edit-listing" data-id="'+l.id+'">Edit Listing</button>'
       + '<button class="btn ghost small" data-action="toggle-sold" data-id="'+l.id+'">'+(l.sold?'Mark Available':'Mark as Sold')+'</button>'
       + '<button class="btn danger small" data-action="delete-listing" data-id="'+l.id+'">Delete Listing</button>'
       + '</div>';
@@ -697,7 +699,8 @@ function renderReviews(l){
   }
   const list = (l.reviews||[]).map(function(r){
     let s=''; for(let i=1;i<=5;i++) s += i<=r.rating?'&#9733;':'&#9734;';
-    return '<div class="review"><div class="review-head"><strong style="color:var(--ink);">'+escapeHtml(r.username)+'</strong><span>'+fmtDate(r.created_at)+'</span></div>'
+    const canDelete = u && cache.session && (cache.session.user.id === r.user_id || isAdmin());
+    return '<div class="review"><div class="review-head"><strong style="color:var(--ink);">'+escapeHtml(r.username)+'</strong><span>'+fmtDate(r.created_at)+(canDelete?' &middot; <a href="#" data-action="delete-review" data-id="'+r.id+'" style="color:var(--danger);">Delete</a>':'')+'</span></div>'
       + '<div class="stars">'+s+'</div><p style="margin:6px 0 0;">'+nl2br(r.comment)+'</p></div>';
   }).join('') || '<p class="helptext">No reviews yet \u2014 be the first.</p>';
 
@@ -729,6 +732,37 @@ function renderSellForm(){
 }
 function accessDeniedBlock(){
   return '<div class="wrap section"><div class="empty-state">This page is only available to CT Bridge Bikes owner accounts.</div></div>';
+}
+function renderEditListingForm(id){
+  if(!isAdmin()) return accessDeniedBlock();
+  const l = cache.listings.find(x=>x.id===id);
+  if(!l) return '<div class="wrap section"><div class="empty-state">Listing not found.</div></div>';
+  const existingImgsHtml = (l.images||[]).map(function(url){
+    return '<div class="preview-thumb"><img src="'+url+'"><button type="button" class="rm" data-action="remove-existing-image" data-id="'+l.id+'" data-url="'+encodeURIComponent(url)+'">&times;</button></div>';
+  }).join('');
+  return '<div class="wrap section">'
+    + '<span class="eyebrow">Owner Tools</span>'
+    + '<h2 style="margin-bottom:20px;">Edit Listing</h2>'
+    + '<form id="sell-form" class="form-card" data-editing="'+l.id+'">'
+    +   '<label>Category</label>'
+    +   '<select name="category"><option value="bike" '+(l.category==='bike'?'selected':'')+'>Bike</option><option value="scooter" '+(l.category==='scooter'?'selected':'')+'>Scooter</option></select>'
+    +   '<label>Title</label>'
+    +   '<input type="text" name="title" value="'+escapeHtml(l.title)+'" required>'
+    +   '<div class="field-row"><div>'
+    +     '<label>Price (USD)</label><input type="number" name="price" min="0" step="1" value="'+l.price+'" required>'
+    +   '</div><div>'
+    +     '<label>Condition (optional)</label><input type="text" name="condition" value="'+escapeHtml(l.condition||'')+'">'
+    +   '</div></div>'
+    +   '<label>Description</label>'
+    +   '<textarea name="description" required>'+escapeHtml(l.description)+'</textarea>'
+    +   '<label>Current Photos</label>'
+    +   '<div class="preview-row">'+(existingImgsHtml||'<p class="helptext">No photos yet.</p>')+'</div>'
+    +   '<label>Add More Photos</label>'
+    +   '<div class="upload-box" data-action="trigger-file"><input type="file" id="sell-images" accept="image/*" multiple style="display:none;">Click to upload photo(s)</div>'
+    +   '<div class="preview-row" id="sell-preview"></div>'
+    +   '<button class="btn" type="submit" id="sell-submit-btn">Save Changes</button> '
+    +   '<button class="btn ghost" type="button" data-action="open-listing" data-id="'+l.id+'">Cancel</button>'
+    + '</form></div>';
 }
 function renderMyListings(){
   if(!isAdmin()) return accessDeniedBlock();
@@ -993,6 +1027,46 @@ async function deleteListing(id){
   toast('Listing deleted.');
   renderShell();
 }
+async function updateListing(id, data){
+  setBusy(true);
+  const btn = document.getElementById('sell-submit-btn');
+  if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Saving\u2026'; }
+  try{
+    const { error } = await sb.from('listings').update({
+      category: data.category, title: data.title.trim(), price: Number(data.price)||0,
+      description: data.description.trim(), condition: (data.condition||'').trim()
+    }).eq('id', id);
+    if(error) throw error;
+    if(uiCache.pendingFiles.length){
+      const existing = cache.listings.find(x=>x.id===id);
+      const existingCount = existing ? existing.images.length : 0;
+      const urls = await uploadImages(uiCache.pendingFiles, 'listings');
+      if(urls.length){
+        const rows = urls.map((url,i)=>({ listing_id:id, url, position: existingCount+i }));
+        const { error: imgErr } = await sb.from('listing_images').insert(rows);
+        if(imgErr) console.error(imgErr);
+      }
+    }
+    uiCache.pendingFiles = [];
+    uiCache.pendingPreviewUrls.forEach(u=>URL.revokeObjectURL(u));
+    uiCache.pendingPreviewUrls = [];
+    await fetchListings();
+    toast('Listing updated.');
+    route = { tab:'listing', listingId:id };
+    renderShell();
+  }catch(e){
+    toast('Could not save changes: ' + friendlyError(e));
+    if(btn){ btn.disabled = false; btn.textContent = 'Save Changes'; }
+  }
+  setBusy(false);
+}
+async function removeExistingImage(listingId, encodedUrl){
+  const url = decodeURIComponent(encodedUrl);
+  const { error } = await sb.from('listing_images').delete().eq('listing_id', listingId).eq('url', url);
+  if(error){ toast('Could not remove photo: ' + friendlyError(error)); return; }
+  await fetchListings();
+  renderMain();
+}
 async function toggleSold(id){
   const l = cache.listings.find(x=>x.id===id);
   if(!l) return;
@@ -1023,6 +1097,14 @@ async function postReview(listingId, rating, comment){
   if(error){ toast('Could not post review: ' + friendlyError(error)); return; }
   await fetchListings();
   toast('Review posted.');
+  renderMain();
+}
+async function deleteReview(reviewId){
+  if(!confirm('Delete this review?')) return;
+  const { error } = await sb.from('reviews').delete().eq('id', reviewId);
+  if(error){ toast('Could not delete: ' + friendlyError(error)); return; }
+  await fetchListings();
+  toast('Review deleted.');
   renderMain();
 }
 
@@ -1091,7 +1173,10 @@ document.addEventListener('click', function(e){
     }
     case 'toggle-sold': toggleSold(t.getAttribute('data-id')); break;
     case 'delete-listing': deleteListing(t.getAttribute('data-id')); break;
+    case 'edit-listing': route = { tab:'editlisting', listingId: t.getAttribute('data-id') }; renderShell(); break;
+    case 'remove-existing-image': removeExistingImage(t.getAttribute('data-id'), t.getAttribute('data-url')); break;
     case 'reserve-listing': reserveListing(t.getAttribute('data-id')); break;
+    case 'delete-review': deleteReview(t.getAttribute('data-id')); break;
     case 'pick-star': {
       const val = t.getAttribute('data-val');
       document.getElementById('rating-input').value = val;
@@ -1153,12 +1238,20 @@ document.addEventListener('submit', function(e){
     })();
   }
   else if(form.id === 'sell-form'){
-    if(!uiCache.pendingFiles.length && !confirm('Publish this listing without any photos?')) return;
+    const editingId = form.getAttribute('data-editing');
     const fd = new FormData(form);
-    createListing({
-      category: fd.get('category'), title: fd.get('title'), price: fd.get('price'),
-      description: fd.get('description'), condition: fd.get('condition')
-    });
+    if(editingId){
+      updateListing(editingId, {
+        category: fd.get('category'), title: fd.get('title'), price: fd.get('price'),
+        description: fd.get('description'), condition: fd.get('condition')
+      });
+    } else {
+      if(!uiCache.pendingFiles.length && !confirm('Publish this listing without any photos?')) return;
+      createListing({
+        category: fd.get('category'), title: fd.get('title'), price: fd.get('price'),
+        description: fd.get('description'), condition: fd.get('condition')
+      });
+    }
   }
   else if(form.id === 'review-form'){
     const fd = new FormData(form);
