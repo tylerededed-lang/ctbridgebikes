@@ -311,6 +311,7 @@ function friendlyError(error){
   if(/already registered/i.test(msg)) return 'That email already has an account — try logging in instead.';
   if(/invalid login credentials/i.test(msg)) return 'Incorrect email or password.';
   if(/unable to validate email|invalid email/i.test(msg)) return 'Please enter a valid email address.';
+  if(/token has expired|invalid otp|invalid token|otp_expired/i.test(msg)) return 'That code is incorrect or expired — try resending it.';
   if(/password should be at least/i.test(msg)) return 'Password must be at least 6 characters.';
   return msg;
 }
@@ -823,6 +824,27 @@ function oauthButtonsHtml(){
     +   '<button type="button" class="btn ghost" data-action="oauth-login" data-provider="azure">Continue with Microsoft</button>'
     + '</div>';
 }
+function openVerifyCodeModal(email){
+  openModal(
+    '<h2 style="margin-bottom:10px;">Check Your Email</h2>'
+    + '<p class="helptext" style="margin-top:0;">We sent a 6-digit code to '+escapeHtml(email)+'. Enter it below to finish creating your account.</p>'
+    + '<form id="verify-form" data-email="'+escapeHtml(email)+'">'
+    +   '<label>6-digit code</label><input type="text" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required>'
+    +   '<button class="btn" type="submit" style="width:100%;" id="verify-btn">Verify &amp; Continue</button>'
+    + '</form>'
+    + '<p class="helptext" style="margin-top:14px;">Didn\'t get it? Check spam, or <a href="#" data-action="resend-code" data-email="'+escapeHtml(email)+'">resend the code</a>.</p>'
+  );
+}
+function openSetPasswordModal(){
+  openModal(
+    '<h2 style="margin-bottom:10px;">Create a Password</h2>'
+    + '<p class="helptext" style="margin-top:0;">You signed in with Google or Microsoft. Set a password too so you can also log in with just your email next time.</p>'
+    + '<form id="setpw-form">'
+    +   '<label>New password</label><input type="password" name="password" required minlength="6">'
+    +   '<button class="btn" type="submit" style="width:100%;" id="setpw-btn">Save Password</button>'
+    + '</form>'
+  );
+}
 function openSettingsModal(){
   const u = currentUser();
   let adminSection = '';
@@ -874,11 +896,16 @@ async function doSignup(email, username, password){
   if(error){ toast(friendlyError(error)); return false; }
   await refreshSession();
   if(!cache.profile){
-    toast('Account created. If your project has email confirmation turned on, turn it off in Supabase (see DEPLOY.md) so sign-up logs you straight in.');
+    openVerifyCodeModal(email);
     return false;
   }
   toast('Account created \u2014 welcome, ' + username + '.');
   return true;
+}
+async function resendCode(email){
+  const { error } = await sb.auth.resend({ type:'signup', email: email });
+  if(error){ toast('Could not resend: ' + friendlyError(error)); return; }
+  toast('Code resent \u2014 check your email.');
 }
 async function doLogout(){
   await sb.auth.signOut();
@@ -1140,6 +1167,7 @@ document.addEventListener('click', function(e){
     case 'close-modal-bg': if(e.target.classList.contains('overlay')) closeModal(); break;
     case 'logout': doLogout().then(renderShell); break;
     case 'oauth-login': doOAuthLogin(t.getAttribute('data-provider')); break;
+    case 'resend-code': resendCode(t.getAttribute('data-email')); break;
     case 'toggle-theme': toggleTheme(); break;
 
     case 'hb-edit': startHomeEdit(); break;
@@ -1258,6 +1286,34 @@ document.addEventListener('submit', function(e){
     postReview(form.getAttribute('data-id'), fd.get('rating'), fd.get('comment'));
     form.reset();
   }
+  else if(form.id === 'verify-form'){
+    const fd = new FormData(form);
+    const email = form.getAttribute('data-email');
+    const btn = document.getElementById('verify-btn');
+    if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Verifying\u2026'; }
+    (async function(){
+      const { error } = await sb.auth.verifyOtp({ email: email, token: fd.get('code'), type:'signup' });
+      if(error){ toast(friendlyError(error)); if(btn){ btn.disabled=false; btn.textContent='Verify & Continue'; } return; }
+      await refreshSession();
+      toast('Email verified \u2014 welcome!');
+      closeModal();
+      renderShell();
+    })();
+  }
+  else if(form.id === 'setpw-form'){
+    const fd = new FormData(form);
+    const btn = document.getElementById('setpw-btn');
+    if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Saving\u2026'; }
+    (async function(){
+      const { error } = await sb.auth.updateUser({ password: fd.get('password') });
+      if(error){ toast('Could not set password: ' + friendlyError(error)); if(btn){ btn.disabled=false; btn.textContent='Save Password'; } return; }
+      const { error: rpcErr } = await sb.rpc('mark_password_set');
+      if(rpcErr) console.error(rpcErr);
+      if(cache.profile) cache.profile.has_password = true;
+      toast('Password set.');
+      closeModal();
+    })();
+  }
 });
 
 /* ---------------------------------------------------------
@@ -1289,6 +1345,9 @@ async function init(){
   sb.auth.onAuthStateChange(function(){ /* session is re-read via refreshSession() around actions; nothing to do here */ });
 
   renderShell();
+  if(cache.profile && cache.profile.has_password === false){
+    openSetPasswordModal();
+  }
 }
 init();
 
